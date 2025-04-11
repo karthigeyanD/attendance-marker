@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin - Today’s Attendance</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.5rem; border: 1px solid #ccc; text-align: center; }
+    tr.duplicate { background-color: #ffdddd; }
+  </style>
+</head>
+<body>
+  <h1>Today’s Attendance</h1>
+  <a href="/download">📥 Download CSV</a>
+  <table>
+    <tr>
+      <th>Name</th>
+      <th>Reg No</th>
+      <th>Date</th>
+      <th>Time</th>
+      <th>IP</th>
+      <th>Device</th>
+    </tr>
+    {% for row in records %}
+    <tr class="{{ 'duplicate' if row['Duplicate'] else '' }}">
+      <td>{{ row['Name'] }}</td>
+      <td>{{ row['RegNo'] }}</td>
+      <td>{{ row['Date'] }}</td>
+      <td>{{ row['Time'] }}</td>
+      <td>{{ row['IP'] }}</td>
+      <td>{{ row['Device'] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>
+
