@@ -1,69 +1,61 @@
-from flask import Flask, render_template, request, send_file
-from datetime import datetime
-import csv, os, socket
+from flask import Flask, render_template, request, redirect
 import pandas as pd
-import qrcode
+from datetime import datetime
+import os
 
 app = Flask(__name__)
-CSV_FILE = "attendance.csv"
 
-def get_client_info(req):
-    ip = request.remote_addr
-    device = request.user_agent.string
-    return ip, device
+attendance_file = "attendance.csv"
 
-def generate_qr(url):
-    img = qrcode.make(url)
-    img.save("static/qr.png")
-
-@app.route("/", methods=["GET", "POST"])
+@app.route('/')
 def index():
-    submitted = False
-    if request.method == "POST":
-        name = request.form["name"]
-        reg = request.form["reg"]
-        date = datetime.now().strftime("%Y-%m-%d")
-        time = datetime.now().strftime("%H:%M:%S")
-        ip, device = get_client_info(request)
+    return render_template('index.html')
 
-        new_row = [name, reg, date, time, ip, device]
-        repeated = check_duplicate_today(new_row)
+@app.route('/submit', methods=['POST'])
+def submit():
+    name = request.form['name']
+    regno = request.form['regno']
+    date = datetime.now().strftime("%Y-%m-%d")
+    time = datetime.now().strftime("%H:%M:%S")
+    ip = request.remote_addr
+    user_agent = request.headers.get('User-Agent')
 
-        with open(CSV_FILE, "a", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(new_row)
+    # Prepare new row
+    new_entry = {
+        "Name": name,
+        "RegNo": regno,
+        "Date": date,
+        "Time": time,
+        "IP": ip,
+        "Device": user_agent
+    }
 
-        submitted = True
+    # Create file with header if not exists
+    if not os.path.exists(attendance_file):
+        df = pd.DataFrame(columns=["Name", "RegNo", "Date", "Time", "IP", "Device"])
+        df.to_csv(attendance_file, index=False)
 
-    return render_template("index.html", submitted=submitted)
+    # Append entry
+    df = pd.read_csv(attendance_file)
+    df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+    df.to_csv(attendance_file, index=False)
 
-def check_duplicate_today(row):
-    if not os.path.exists(CSV_FILE):
-        return False
+    return render_template('success.html', name=name)
 
-    df = pd.read_csv(CSV_FILE)
-    name, reg, date, _, ip, device = row
-    today_df = df[df["Date"] == date]
-    match = today_df[(today_df["Name"] == name) & (today_df["RegNo"] == reg)]
-    return not match.empty
-
-@app.route("/admin")
+@app.route('/admin')
 def admin():
-    if not os.path.exists(CSV_FILE):
-        return "No records yet."
+    if not os.path.exists(attendance_file):
+        return "No attendance data found."
 
-    df = pd.read_csv(CSV_FILE)
+    df = pd.read_csv(attendance_file)
     today = datetime.now().strftime("%Y-%m-%d")
+
+    if "Date" not in df.columns:
+        return "Error: 'Date' column not found in the CSV. Please check your file."
+
     today_df = df[df["Date"] == today]
-    duplicated = today_df.duplicated(subset=["Name", "RegNo"], keep='first')
-    today_df["Duplicate"] = duplicated
-    return render_template("admin.html", records=today_df.to_dict(orient="records"))
 
-@app.route("/download")
-def download():
-    return send_file(CSV_FILE, as_attachment=True)
+    return render_template('admin.html', data=today_df.to_dict(orient='records'))
 
-if __name__ == "__main__":
-    ip_address = socket.gethostbyname(socket.gethostname())
-    generate_qr(f"http://{ip_address}:5000")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__ == '__main__':
+    app.run(debug=True)
